@@ -309,8 +309,15 @@ export function action(fn) {
  * recomputed. This is where this paradigm really gets powerful.
  */
 export function computed(fn) {
+    
+    // The computed function is an observable, so it needs an observable symbol
     const observableSymbol = Symbol(fn.name);
     
+    // We store the most recently-computed value in scope. We then set up a 
+    // reaction (see reaction() above) which tracks the user-supplied function,
+    // and when it gets published, saves the new latest value in our cache.
+    // If the value changed (via a simple triple-equals; we don't attempt a 
+    // deep check), we publish on to this computed's subscribers.
     let cachedValue;
     reaction(
         fn,
@@ -324,6 +331,8 @@ export function computed(fn) {
             }
         })
 
+    // We track observers of this computed function's return value, so that they
+    // can later be published to (above).
     return function() {
         subscriptionsStore.track(observableSymbol);
         return cachedValue;
