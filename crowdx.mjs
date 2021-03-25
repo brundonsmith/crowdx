@@ -38,6 +38,12 @@ class CrowdXTrackingStore {
         this.currentTrackedFunction = null;
         this.currentTrackedObservables = null;
     }
+
+    
+    /**
+     * Given an observable, tracks it in the context of the currently-running 
+     * tracked function, if any.
+     */
     track(observable) {
         if (this.currentTrackedFunction != null) {
             this.currentTrackedObservables.add(observable);
