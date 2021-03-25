@@ -1,4 +1,4 @@
-# CrowdX: A tiny MobX-like reactivity library in less than 3k
+# CrowdX: A tiny MobX-like reactivity library in less than 400 lines
 
 I created this because I'm a huge fan of MobX, but the "magic" that goes into 
 it - while simple at its heart - may not be clear to everybody, and can be a 
