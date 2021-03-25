@@ -21,8 +21,9 @@ done with vanilla JS, but it should translate very directly to React or
 whichever unopinionated rendering library you'd like to use.
 
 ## Project goals (in order)
-1. Be a good, thoroughly-commented demonstration of the principles behind MobX
-2. Be a simple and minimal library: no bells and whistles, just the core 
+1. Being a good, thoroughly-commented demonstration of the principles behind 
+MobX
+2. Being a simple and minimal library: no bells and whistles, just the core 
 mechanisms, smallest footprint possible (except when that conflicts with 
 point #1)
 
@@ -32,11 +33,11 @@ even shipped as an ES module. It doesn't work on IE. It should work on
 recent-ish versions of major browsers. You could probably stretch support with
 some combination of polyfills, babel, and webpack, but improving/maintaining
 browser reach is not a project priority.
-2. Be ergonomic - by this I mainly mean: MobX comes with lots of fancy utility 
+2. Being ergonomic - by this I mainly mean: MobX comes with lots of fancy utility 
 functions, as well as things like decorator support, to maximize the elegance of
 application code. That's great, I love those things, but they aren't what this
 project is about and I don't plan on adding them.
-3. Be maximally performant - I tried to be sane with performance, this library
+3. Being maximally performant - I tried to be sane with performance, this library
 shouldn't be *un*-performant, but readability is the top priority. Also, I 
 suspect MobX has an insane amount of clever optimization going on behind the 
 scenes from years of development, and I'm just not interested in spending much 
@@ -46,8 +47,9 @@ time on that or sacrificing the project's readability/educational value.
 - Bug fixes. If something doesn't do what it should, that's pretty important to 
 the project goals
 - Comment/documentation fixes. Same as above
-- Readability suggestions in code or comments. These are pretty subjective so
-I reserve the right to turn them down, but I'll consider them.
+- Readability/clarification suggestions in the code or comments. These are 
+pretty subjective so I reserve the right to turn them down, but I'll consider 
+them.
 - Really egregious performance or usability problems. Again, subject to denial,
 but if it's on the order of "makes this completely impossible to use for 
 anything real" and/or "it would not complicate things at all to fix", I'm open 
@@ -76,9 +78,9 @@ the app (tracked functions) to react once both of them have been updated, then
 the function doing the mutating can be made into an action.
 
 Technically the above is all you need; you can build everything else on top of 
-these three concepts. However, one additional concept is included because it is 
-so incredibly useful/common in practice, and is central to the CrowdX/MobX 
-philosophy:
+these three concepts. However, one additional concept is included in CrowdX 
+because it is so incredibly useful/common in practice, and is central to the 
+CrowdX/MobX philosophy:
 
 **Computed function** - A computed function is **both a tracked function and an 
 observable**. It's a pure function that observes observables and derives from
