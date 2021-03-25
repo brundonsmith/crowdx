@@ -182,12 +182,16 @@ const proxyHandler = {
      * object tree remains observable all the way down.
      */
     set: function (target, prop, value) {
-        const newProperty = !Object.keys(target).includes(prop);
+        const newProperty = !target.hasOwnProperty(prop);
+        
+        if (target[OBSERVABLE_HANDLES][prop] == null) {
+            target[OBSERVABLE_HANDLES][prop] = Symbol(prop);
+        }
+
         target[prop] = observable(value, target[OBSERVABLE_HANDLES][prop]);
 
         if (newProperty) {
             subscriptionsStore.publish(target[PARENT_OBSERVABLE]);
-            target[OBSERVABLE_HANDLES][prop] = Symbol(prop);
         } else {
             subscriptionsStore.publish(target[OBSERVABLE_HANDLES][prop]);
         }
@@ -238,11 +242,6 @@ export function observable(val, parentObservable) {
             enumerable: false
         });
         
-        // Create the observable symbols for each enumerable property
-        for (const key in val) {
-            observableVal[OBSERVABLE_HANDLES][key] = Symbol(key);
-        }
-
         // Apply the proxy (see proxyHandler above)
         const proxy = new Proxy(observableVal, proxyHandler);
 
