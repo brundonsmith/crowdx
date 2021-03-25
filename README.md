@@ -52,3 +52,59 @@ I reserve the right to turn them down, but I'll consider them.
 but if it's on the order of "makes this completely impossible to use for 
 anything real" and/or "it would not complicate things at all to fix", I'm open 
 to addressing them.
+
+## Concepts
+
+The fundamental concepts (of both CrowdX and MobX) are these:
+
+**Observables** - An observable is some property of an object which has been 
+tagged for observation by any **tracked functions** that access it.
+
+**Tracked functions** - A tracked function is a pure function (no side-effects)
+that accesses one or more observables. A tracked function is generally paired 
+with another function which is not pure; its purpose is to produce a 
+side-effect. The pair of these two is referred to as a "reaction". 
+When observables are accessed in the course of the tracked function's execution - 
+anywhere in its call tree - they get associated with the tracked function's 
+corresponding side-effect function in a global mapping from observables -> 
+reactions. Whenever the observable is modified, all of its associated reactions 
+re-evaluate and produce their side-effects.
+
+**Actions** - An action is a way of atomically bundling up multiple observable 
+mutations. In other words, if you want to modify both a and b, but you only want
+the app (tracked functions) to react once both of them have been updated, then
+the function doing the mutating can be made into an action.
+
+Technically the above is all you need; you can build everything else on top of 
+these three concepts. However, one additional concept is included because it is 
+so incredibly useful/common in practice, and is central to the CrowdX/MobX 
+philosophy:
+
+**Computed function** - A computed function is **both a tracked function and an 
+observable**. It's a pure function that observes observables and derives from
+them a value, creating no side-effects. However, internally, the most recent 
+value it created is cached and only ever gets _pushed_ to recompute when one
+of its constituents changes. This avoids the equality checks that so often
+complicate partial-updating in apps. Finally- its cached value can itself be
+tracked, allowing the construction of a graph of values dependent on other 
+values, in which the graph is never stale, and at the same time only the pieces 
+of it that actually need to update ever get updated.
+
+## Architecture summary
+
+When an object or array is made into an observable, it gets replaced by a 
+Proxied version. This new object intercepts get and set calls on all of its 
+properties: getters track the property for whatever tracked function may 
+currently be running, and setters publish to any reactions the property has
+become associated with.
+
+ES Symbols are used to represent each observable; to this end, each proxied 
+object has a hidden mapping from property keys to symbols.
+
+When a tracked function begins running, global state is set to track all 
+observable getters that are triggered up until it's finished. At the end, all of
+these get subscribed to it.
+
+A similar mechanism happens for actions: when an action starts, global state is
+set which tracks all observable *setters* that are triggered up until it's 
+finished. At the end, all reactions associated with any of these get triggered.
