@@ -3,7 +3,7 @@
 I created this because I'm a huge fan of MobX, but the "magic" that goes into 
 it - while simple at its heart - may not be clear to everybody, and can be a 
 turn-off for some. So I wanted to create a minimal demonstration of the 
-principles to rob them of their mystery, and hopefull make more people 
+principles to rob them of their mystery, and hopefully make more people 
 comfortable using this kind of paradigm.
 
 Secondarily: this was a learning experience for me to more thoroughly 

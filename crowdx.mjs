@@ -14,7 +14,7 @@ class CrowdXTrackingStore {
 
 
     /**
-     * When a tracted function is being tracked, a reference to it is kept in 
+     * When a tracked function is being tracked, a reference to it is kept in 
      * currentTrackedFunction and the observables it encounters are registered 
      * in currentTrackedObservables. When the function completes, all 
      * observables that were found get subscribed-to, and these pieces of state 
@@ -114,7 +114,7 @@ class CrowdXTrackingStore {
 
 
 /**
- * Singelton instance of CrowdXTrackingStore
+ * Singleton instance of CrowdXTrackingStore
  */
 const subscriptionsStore = new CrowdXTrackingStore();
 
