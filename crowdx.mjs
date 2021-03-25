@@ -187,6 +187,7 @@ const proxyHandler = {
 
         if (newProperty) {
             subscriptionsStore.publish(target[PARENT_OBSERVABLE]);
+            target[OBSERVABLE_HANDLES][prop] = Symbol(prop);
         } else {
             subscriptionsStore.publish(target[OBSERVABLE_HANDLES][prop]);
         }
