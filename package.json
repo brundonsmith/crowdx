@@ -1,0 +1,11 @@
+{
+  "name": "crowdx",
+  "version": "1.0.0",
+  "description": "A tiny MobX-like reactivity library",
+  "main": "crowdx.mjs",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Brandon Smith",
+  "license": "MIT"
+}
