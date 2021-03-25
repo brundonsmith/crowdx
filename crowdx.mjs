@@ -182,18 +182,28 @@ const proxyHandler = {
      * object tree remains observable all the way down.
      */
     set: function (target, prop, value) {
-        const newProperty = !target.hasOwnProperty(prop);
-        
-        if (target[OBSERVABLE_HANDLES][prop] == null) {
-            target[OBSERVABLE_HANDLES][prop] = Symbol(prop);
-        }
 
-        target[prop] = observable(value, target[OBSERVABLE_HANDLES][prop]);
-
-        if (newProperty) {
-            subscriptionsStore.publish(target[PARENT_OBSERVABLE]);
-        } else {
-            subscriptionsStore.publish(target[OBSERVABLE_HANDLES][prop]);
+        // if the value didn't actually change, do 
+        // nothing (importantly: don't publish)
+        if (target[prop] !== value) {
+            const newProperty = !target.hasOwnProperty(prop);
+            
+            // if there isn't already an observable Symbol for this property,
+            // create one
+            if (target[OBSERVABLE_HANDLES][prop] == null) {
+                target[OBSERVABLE_HANDLES][prop] = Symbol(prop);
+            }
+    
+            // assign the new value, wrapping it in an observable if needed
+            target[prop] = observable(value, target[OBSERVABLE_HANDLES][prop]);
+    
+            if (newProperty) {
+                // if this is a new property, notify the parent that the 
+                // "entire object" changed
+                subscriptionsStore.publish(target[PARENT_OBSERVABLE]);
+            } else {
+                subscriptionsStore.publish(target[OBSERVABLE_HANDLES][prop]);
+            }
         }
 
         return true;
@@ -316,31 +326,21 @@ export function action(fn) {
  */
 export function computed(fn) {
     
-    // The computed function is an observable, so it needs an observable symbol
-    const observableSymbol = Symbol(fn.name);
+    // We store the most recently-computed value in an observable in scope
+    const cache = observable({ value: undefined });
     
-    // We store the most recently-computed value in scope. We then set up a 
-    // reaction (see reaction() above) which tracks the user-supplied function,
-    // and when it gets published, saves the new latest value in our cache.
-    // If the value changed (via a simple triple-equals; we don't attempt a 
-    // deep check), we publish on to this computed's subscribers.
-    let cachedValue;
+    // We eagerly set up our reaction, computing the initial cache value 
+    // immediately by calling fn()
     reaction(
         fn,
-        val => {
-            const changed = val !== cachedValue;
+        val => cache.value = val)
 
-            cachedValue = val;
 
-            if (changed) {
-                subscriptionsStore.publish(observableSymbol);
-            }
-        })
-
-    // We track observers of this computed function's return value, so that they
-    // can later be published to (above).
     return function() {
-        subscriptionsStore.track(observableSymbol);
-        return cachedValue;
+        
+        // When the computed function is called all we do is access the cache. 
+        // But since the cache is observable, recipients will receive "push" 
+        // updates whenever fn() is recomputed.
+        return cache.value;
     }
 }
