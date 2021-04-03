@@ -5,48 +5,36 @@
  */
 class CrowdXTrackingStore {
 
-
-    /**
-     * This is a mapping from observables (Symbols) to the Set of functions that
-     * should be triggered upon their publication
-     */
-    observableMappings = new Map();
-
-
     /**
      * When a tracked function is being tracked, a reference to it is kept in 
      * currentTrackedFunction and the observables it encounters are registered 
-     * in currentTrackedObservables. When the function completes, all 
-     * observables that were found get subscribed-to, and these pieces of state 
+     * in reactionSetsForCurrentTrackedFn. When the function completes, the 
+     * reaction is added to all found observables, and these pieces of state 
      * get cleared.
      */
     currentTrackedFunction = null;
-    currentTrackedObservables = null;
+    reactionSetsForCurrentTrackedFn = null;
     beginTracking(func) {
         this.currentTrackedFunction = func;
-        this.currentTrackedObservables = new Set();
+        this.reactionSetsForCurrentTrackedFn = new Set();
     }
     completeTracking() {
-        for (const observable of this.currentTrackedObservables) {
-            if (!this.observableMappings.has(observable)) {
-                this.observableMappings.set(observable, new Set());
-            }
-
-            this.observableMappings.get(observable).add(this.currentTrackedFunction);
+        for (const reactionSet of this.reactionSetsForCurrentTrackedFn) {
+            reactionSet.add(this.currentTrackedFunction);
         }
 
         this.currentTrackedFunction = null;
-        this.currentTrackedObservables = null;
+        this.reactionSetsForCurrentTrackedFn = null;
     }
 
     
     /**
-     * Given an observable, tracks it in the context of the currently-running 
-     * tracked function, if any.
+     * Given an observable's reaction set, tracks it in the context of the 
+     * currently-running tracked function, if any.
      */
-    track(observable) {
+    track(reactionSet) {
         if (this.currentTrackedFunction != null) {
-            this.currentTrackedObservables.add(observable);
+            this.reactionSetsForCurrentTrackedFn.add(reactionSet);
         }
     }
 
@@ -57,51 +45,56 @@ class CrowdXTrackingStore {
      * currentActionObservables. Once the action is complete, all of those 
      * observables finally publish at once, with a consistent app state.
      */
-    currentActionObservables = null;
+    currentActionReactionSets = null;
     beginAction() {
-        this.currentActionObservables = new Set();
+        this.currentActionReactionSets = new Set();
     }
     completeAction() {
-        const observables = this.currentActionObservables;
-        this.currentActionObservables = null;
+        const observables = this.currentActionReactionSets;
+        this.currentActionReactionSets = null;
 
         this.publishAll(observables);
     }
 
 
     /**
-     * Given an observable, runs all corresponding reactions.
+     * Given the reaction set for an observable which was mutated, takes 
+     * the appropriate course of action depending on whether or not we're 
+     * currently inside an action.
      */
-    publish(observable) {
-        if (this.observableMappings.has(observable)) {
-            if (this.currentActionObservables != null) {
-                this.currentActionObservables.add(observable);
-            } else {
-                for (const reaction of this.observableMappings.get(observable)) {
-                    reaction();
-                }
+    publish(reactionSet) {
+        if (this.currentActionReactionSets != null) {
+            // If we're in an action, set the reactions aside for later
+            this.currentActionReactionSets.add(reactionSet);
+        } else {
+            // Else, go ahead and trigger them
+            for (const reaction of reactionSet) {
+                reaction();
             }
         }
     }
 
     
     /**
-     * Given multiple observables, runs all corresponding reactions. They get
-     * combined into a single Set so that if there are duplicates (multiple 
-     * observables trigger the same reactions), those only run once.
+     * Same as publish(), but for multiple sets of reaction. De-dupes reactions
+     * to avoid redundant calls.
      */
-    publishAll(observables) {
-        if (this.currentActionObservables != null) {
-            for (const observable of observables) {
-                this.currentActionObservables.add(observable);
+    publishAll(reactionSets) {
+        if (this.currentActionReactionSets != null) {
+            // If we're in an action, set all reactions aside for later
+            for (const reactionSet of reactionSets) {
+                this.currentActionReactionSets.add(reactionSet);
             }
         } else {
+            // Else, go ahead and trigger them
             const allReactions = new Set();
-            for (const observable of observables) {
-                if (this.observableMappings.has(observable)) {
-                    for (const reaction of this.observableMappings.get(observable)) {
-                        allReactions.add(reaction);
-                    }
+
+            // Reactions get combined into a single Set so that if there are 
+            // duplicates (multiple observables trigger the same reaction), 
+            // those only get run once.
+            for (const reactionSet of reactionSets) {
+                for (const reaction of reactionSet) {
+                    allReactions.add(reaction);
                 }
             }
 
@@ -121,18 +114,19 @@ const subscriptionsStore = new CrowdXTrackingStore();
 
 /**
  * Used to store/retrieve a hidden property on observable objects referring to
- * their parent observable (if any). This is needed for cases where a change to 
- * the observable object doesn't affect any of its known (observed properties),
- * but needs to let any parent know which might have iterated over its members.
+ * their parent observable's reaction set (if any). This is needed for cases 
+ * where a change to the observable object doesn't affect any of its known 
+ * (observed properties), but needs to let any parent know which might have 
+ * iterated over its members.
  */
-const PARENT_OBSERVABLE = Symbol("PARENT_OBSERVABLE");
+const PARENT_REACTIONS = Symbol("PARENT_REACTIONS");
 
 /**
  * Used to store/retrieve a hidden property on observable objects referring to
- * the collection of observable symbols for each of its enumerable properties.
+ * the collection of reaction sets for each of its observable properties.
  * These are used for publication/subscription.
  */
-const OBSERVABLE_HANDLES = Symbol("OBSERVABLE_HANDLES");
+const PROPERTY_REACTIONS = Symbol("OBSERVABLE_REACTIONS");
 
 /**
  * Unlike objects, arrays have mutation methods that we need to handle correctly
@@ -150,9 +144,8 @@ const proxyHandler = {
 
     /**
      * We override the property getter so that if we're currently running a 
-     * tracked function, the accessed property's observable symbol will be 
-     * registered to the ongoing function for publication 
-     * (via subscriptionsStore.currentTrackedObservables).
+     * tracked function, the accessed property's reaction-set will get the 
+     * ongoing function's reaction added to it for publication.
      * 
      * We also take this opportunity to swap certain methods on the Array object
      * for ones that will publish their mutations correctly 
@@ -162,12 +155,12 @@ const proxyHandler = {
         if (Array.isArray(target) && ARRAY_MUTATION_METHODS.includes(prop)) {
             return function(...args) {
                 const res = target[prop](...args);
-                subscriptionsStore.publish(target[PARENT_OBSERVABLE]);
+                subscriptionsStore.publish(target[PARENT_REACTIONS]);
                 return res;
             };
         } else {
-            if (target[OBSERVABLE_HANDLES].hasOwnProperty(prop)) {
-                subscriptionsStore.track(target[OBSERVABLE_HANDLES][prop]);
+            if (target[PROPERTY_REACTIONS].hasOwnProperty(prop)) {
+                subscriptionsStore.track(target[PROPERTY_REACTIONS][prop]);
             }
     
             return target[prop];
@@ -188,21 +181,23 @@ const proxyHandler = {
         if (target[prop] !== value) {
             const newProperty = !target.hasOwnProperty(prop);
             
-            // if there isn't already an observable Symbol for this property,
-            // create one
-            if (target[OBSERVABLE_HANDLES][prop] == null) {
-                target[OBSERVABLE_HANDLES][prop] = Symbol(prop);
+            // if there isn't already an observable reaction-set for this 
+            // property, create one
+            if (target[PROPERTY_REACTIONS][prop] == null) {
+                target[PROPERTY_REACTIONS][prop] = new Set();
             }
     
             // assign the new value, wrapping it in an observable if needed
-            target[prop] = observable(value, target[OBSERVABLE_HANDLES][prop]);
+            target[prop] = observable(value, target[PROPERTY_REACTIONS][prop]);
     
             if (newProperty) {
                 // if this is a new property, notify the parent that the 
                 // "entire object" changed
-                subscriptionsStore.publish(target[PARENT_OBSERVABLE]);
+                if (target[PARENT_REACTIONS] != null) {
+                    subscriptionsStore.publish(target[PARENT_REACTIONS]);
+                }
             } else {
-                subscriptionsStore.publish(target[OBSERVABLE_HANDLES][prop]);
+                subscriptionsStore.publish(target[PROPERTY_REACTIONS][prop]);
             }
         }
 
@@ -225,28 +220,28 @@ const proxyHandler = {
  * NOTE: Because of the need for proxying, this function returns a new object,
  * it does not modify the one it's given.
  * 
- * parentObservable is an optional parameter for internal use by the library 
+ * parentReactionSet is an optional parameter for internal use by the library 
  * only. It is used to allow child objects/arrays to publish changes to their 
  * entire selves (as opposed to changes to one of their members).
  */
-export function observable(val, parentObservable) {
-    if (typeof val === "object" && val != null && !Object.hasOwnProperty(OBSERVABLE_HANDLES)) {
+export function observable(val, parentReactionSet) {
+    if (typeof val === "object" && val != null && !Object.hasOwnProperty(PROPERTY_REACTIONS)) {
         const observableVal = Array.isArray(val) ? [] : {};
 
         // If this observable object is a member of an observable parent, make 
         // note of its observable symbol so that the child can publish its
         // entire self when appropriate
-        if (parentObservable != null) {
-            Object.defineProperty(observableVal, PARENT_OBSERVABLE, {
-                value: parentObservable,
+        if (parentReactionSet != null) {
+            Object.defineProperty(observableVal, PARENT_REACTIONS, {
+                value: parentReactionSet,
                 writable: false,
                 enumerable: false
             })
         }
 
-        // Create a hidden property to store the observable symbols for each
-        // of this object's observable properties
-        Object.defineProperty(observableVal, OBSERVABLE_HANDLES, {
+        // Create a hidden property to store the reaction-sets for 
+        // each of this object's observable properties
+        Object.defineProperty(observableVal, PROPERTY_REACTIONS, {
             value: {},
             writable: false,
             enumerable: false
@@ -267,6 +262,17 @@ export function observable(val, parentObservable) {
         }
 
         return proxy;
+    } else if(typeof val === "object" && val != null && !Object.hasOwnProperty(PROPERTY_REACTIONS)) {
+
+        // If this object is already observable but is being moved to a new 
+        // parent, update its parent reaction-set reference
+        if (parentReactionSet != null) {
+            Object.defineProperty(observableVal, PARENT_REACTIONS, {
+                value: parentReactionSet,
+                writable: false,
+                enumerable: false
+            })
+        }
     } else {
         return val;
     }
