@@ -3,6 +3,10 @@
   "version": "1.1.0",
   "description": "A tiny MobX-like reactivity library",
   "main": "crowdx.mjs",
+  "repository": {
+    "type" : "git",
+    "url" : "https://github.com/brundonsmith/crowdx.git"
+  },
   "scripts": {
     "test": "node tests.mjs"
   },
