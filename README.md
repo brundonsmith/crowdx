@@ -110,3 +110,9 @@ these get subscribed to it.
 A similar mechanism happens for actions: when an action starts, global state is
 set which tracks all observable *setters* that are triggered up until it's 
 finished. At the end, all reactions associated with any of these get triggered.
+
+Finally: for the purpose of avoiding memory leaks, all reactions (including 
+computed functions, which are reactions underneath) must be explicitly cleaned 
+up. This is done by passing the handle returned by `reaction()` or `computed()`
+to the `dispose()` function. This will deactivate the reaction and allow its
+referenced values to be cleaned up when appropriate.

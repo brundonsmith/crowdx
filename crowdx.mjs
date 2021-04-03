@@ -5,6 +5,8 @@
  */
 class CrowdXTrackingStore {
 
+    reactionSubscriptionSets = new Map();
+
     /**
      * When a tracked function is being tracked, a reference to it is kept in 
      * currentTrackedFunction and the observables it encounters are registered 
@@ -17,6 +19,10 @@ class CrowdXTrackingStore {
     beginTracking(func) {
         this.currentTrackedFunction = func;
         this.reactionSetsForCurrentTrackedFn = new Set();
+
+        if (!this.reactionSubscriptionSets.has(this.currentTrackedFunction)) {
+            this.reactionSubscriptionSets.set(this.currentTrackedFunction, new Set());
+        }
     }
     completeTracking() {
         for (const reactionSet of this.reactionSetsForCurrentTrackedFn) {
@@ -35,6 +41,27 @@ class CrowdXTrackingStore {
     track(reactionSet) {
         if (this.currentTrackedFunction != null) {
             this.reactionSetsForCurrentTrackedFn.add(reactionSet);
+            this.reactionSubscriptionSets.get(this.currentTrackedFunction).add(reactionSet);
+        }
+    }
+
+    /**
+     * When we're done with a reaction, this method can be used to remove it
+     * from all subscription lists.
+     * 
+     * Beyond just stopping the reaction from continuing to trigger, this is 
+     * important to do when you no longer want the reaction because it allows any 
+     * memory being referenced by it to be cleaned up, preventing memory-leaks.
+     */
+    dispose(reaction) {
+        const reactionSets = this.reactionSubscriptionSets.get(reaction);
+
+        if (reactionSets != null) {
+            for (const reactionSet of reactionSets) {
+                reactionSet.delete(reaction);
+            }
+
+            this.reactionSubscriptionSets.delete(reaction);
         }
     }
 
@@ -290,15 +317,28 @@ export function observable(val, parentReactionSet) {
  * library.
  */
 export function reaction(trackedFn, effectFn) {
-    const reaction = function() {
-        subscriptionsStore.beginTracking(reaction);
+    const reactionFn = function() {
+        subscriptionsStore.beginTracking(reactionFn);
         const result = trackedFn();
         subscriptionsStore.completeTracking();
         effectFn(result);
     }
 
-    reaction();
+    reactionFn();
+
+    const disposalHandle = {};
+
+    Object.defineProperty(disposalHandle, REACTION_FOR_DISPOSAL, {
+        value: reactionFn,
+        writable: false,
+        enumerable: false
+    });
+
+    // We return the reaction so it can be cleaned up later by calling dispose()
+    return disposalHandle;
 }
+
+const REACTION_FOR_DISPOSAL = Symbol("REACTION_FOR_DISPOSAL");
 
 /**
  * An action is a function that mutates observables, but doesn't publish on 
@@ -337,16 +377,43 @@ export function computed(fn) {
     
     // We eagerly set up our reaction, computing the initial cache value 
     // immediately by calling fn()
-    reaction(
+    const reactionHandle = reaction(
         fn,
-        val => cache.value = val)
+        val => cache.value = val);
+    const reactionFn = reactionHandle[REACTION_FOR_DISPOSAL];
 
 
-    return function() {
+    const computedFn = function() {
         
         // When the computed function is called all we do is access the cache. 
         // But since the cache is observable, recipients will receive "push" 
         // updates whenever fn() is recomputed.
         return cache.value;
+    };
+
+    // The returned function secretly stores its reaction function for the 
+    // purpose of cleaning it up across all observables later (yes, you can put 
+    // properties on functions in JavaScript!). See SubscriptionsStore.dispose() 
+    // for more details.
+    Object.defineProperty(computedFn, REACTION_FOR_DISPOSAL, {
+        value: reactionFn,
+        writable: false,
+        enumerable: false
+    });
+
+    return computedFn;
+}
+
+/**
+ * Values returned from reaction() and computed() can be passed to this 
+ * function to "dispose" the relevant reaction.
+ * 
+ * Beyond just stopping the reaction from continuing to trigger, this is 
+ * important to do when you no longer want the reaction because it allows any 
+ * memory being referenced by it to be cleaned up, preventing memory-leaks.
+ */
+export function dispose(disposalHandle) {
+    if (disposalHandle[REACTION_FOR_DISPOSAL] != null) {
+        subscriptionsStore.dispose(disposalHandle[REACTION_FOR_DISPOSAL]);
     }
 }
