@@ -10,11 +10,10 @@ Secondarily: this was a learning experience for me to more thoroughly
 test/explore my own understanding of MobX's concepts. I gained some clarity by 
 stripping things down to their simplest possible form.
 
-Tertiarily: it's... really small. MobX itself is no behemoth, but this appears 
-to be roughly 1/5 its size. CrowdX also does a whole lot less, of course, but 
-the core is there. So, if you want something really extremely tiny and you don't 
-need a lot of features, you could possibly get some value out of using this for 
-a real project.
+Thirdly: it's... really small. MobX itself is no behemoth, but this appears 
+to be less than 1/5 its size. CrowdX doesn't have as many bells and whistles, of 
+course, but the core is there. So if you want an extremely tiny but still 
+powerful reactivity library, this could be just the ticket.
 
 For an example of how to use it, take a look at `example.html`. The example is
 done with vanilla JS, but it should translate very directly to React or 
@@ -32,16 +31,11 @@ point #1)
 even shipped as an ES module. It doesn't work on IE. It should work on 
 recent-ish versions of major browsers. You could probably stretch support with
 some combination of polyfills, babel, and webpack, but improving/maintaining
-browser reach is not a project priority.
-2. Being ergonomic - by this I mainly mean: MobX comes with lots of fancy utility 
-functions, as well as things like decorator support, to maximize the elegance of
-application code. That's great, I love those things, but they aren't what this
-project is about and I don't plan on adding them.
-3. Being maximally performant - I tried to be sane with performance, this library
-shouldn't be *un*-performant, but readability is the top priority. Also, I 
-suspect MobX has an insane amount of clever optimization going on behind the 
-scenes from years of development, and I'm just not interested in spending much 
-time on that or sacrificing the project's readability/educational value.
+browser reach is not a project priority (it does work in NodeJS, though!).
+2. Being super convenient - MobX comes with lots of fancy utility functions 
+built atop the core logic, and also things like decorator support, to maximize convenience for
+application developers. That's great, I love those things, but this project is 
+focused on minimalism.
 
 ## Things I will accept issues or pull-requests for
 - Bug fixes. If something doesn't do what it should, that's pretty important to 
@@ -50,10 +44,6 @@ the project goals
 - Readability/clarification suggestions in the code or comments. These are 
 pretty subjective so I reserve the right to turn them down, but I'll consider 
 them.
-- Really egregious performance or usability problems. Again, subject to denial,
-but if it's on the order of "makes this completely impossible to use for 
-anything real" and/or "it would not complicate things at all to fix", I'm open 
-to addressing them.
 
 ## Concepts
 
