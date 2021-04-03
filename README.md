@@ -1,5 +1,7 @@
 # CrowdX: MobX-style reactivity in less than 250 lines (without comments)
 
+## What is this?
+
 I created this because I'm a huge fan of MobX, but the "magic" that goes into 
 it - while simple at its heart - may not be clear to everybody, and can be a 
 turn-off for some. So I wanted to create a minimal demonstration of the 
@@ -18,6 +20,35 @@ powerful reactivity library, this could be just the ticket.
 For an example of how to use it, take a look at `example.html`. The example is
 done with vanilla JS, but it should translate very directly to React or 
 whichever unopinionated rendering library you'd like to use.
+
+## Usage
+
+```
+npm install --save crowdx
+```
+```javascript
+import { action, reaction, observable, computed } from "/crowdx.mjs";
+
+const appState = observable({
+    firstName: "Bob",
+    lastName: "Belcher",
+    age: 42
+})
+
+reaction(
+    () => `
+        <div>
+            ${appState.lastName}, ${appState.firstName} | Age ${appState.age}
+        </div>
+    `,
+    html => {
+        document.body.innerHTML = html
+    })
+
+setInterval(() => {
+    appState.age = Math.random() * 100;
+}, 1000)
+```
 
 ## Project goals (in order)
 1. Being a good, thoroughly-commented demonstration of the principles behind 
