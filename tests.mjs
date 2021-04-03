@@ -40,7 +40,7 @@ test(function testCreateObservableObject() {
     }
 })
 
-test(function testCreateNestedObservableObjects() {
+test(function testCreateNestedObservableObject() {
     const obs = observable({
         foo: {
             bar: "stuff",
@@ -52,11 +52,29 @@ test(function testCreateNestedObservableObjects() {
     }
 
     if (!types.isProxy(obs.foo)) {
-        return "Nested object is not Proxy";
+        return "Nested object from initializer is not Proxy";
     }
 
     if (obs.foo.bar !== "stuff") {
         return "Deep string property was lost when creating observable";
+    }
+})
+
+test(function testCreateNewNestedObservableObject() {
+    const obs = observable({
+        foo: {
+            bar: "stuff",
+        },
+    });
+
+    obs.foo = { bar: "other" };
+
+    if (obs.foo.bar !== "other") {
+        return "New object property wasn't added to observable";
+    }
+
+    if (!types.isProxy(obs.foo)) {
+        return "New nested object is not Proxy";
     }
 })
 
