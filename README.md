@@ -27,7 +27,7 @@ whichever unopinionated rendering library you'd like to use.
 npm install --save crowdx
 ```
 ```javascript
-import { action, reaction, observable, computed } from "/crowdx.mjs";
+import { observable, reaction } from "/crowdx.mjs";
 
 const appState = observable({
     firstName: "Bob",
