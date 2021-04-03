@@ -1,4 +1,4 @@
-# CrowdX: MobX-style reactivity in less than 250 lines (without comments)
+# CrowdX: MobX-style reactivity in less than 250 lines (not including comments)
 
 ## What is this?
 
