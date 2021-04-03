@@ -100,8 +100,8 @@ properties: getters track the property for whatever tracked function may
 currently be running, and setters publish to any reactions the property has
 become associated with.
 
-ES Symbols are used to represent each observable; to this end, each proxied 
-object has a hidden mapping from property keys to symbols.
+Each proxied object maintains a hidden mapping from property keys to sets of 
+reaction functions. When it publishes, all of its reactions are triggered.
 
 When a tracked function begins running, global state is set to track all 
 observable getters that are triggered up until it's finished. At the end, all of
