@@ -26,8 +26,8 @@
 
     /**
      * When a tracked function is being tracked, a reference to it is kept in 
-     * currentTracking.trackedFunction and the observables it encounters are registered 
-     * in reactionSetsForCurrentTrackedFn. When the function completes, the 
+     * currentlyTracking.trackedFunction and the observables it encounters are registered 
+     * in currentlyTracking.reactionSets. When the function completes, the 
      * reaction is added to all found observables, and these pieces of state 
      * get cleared.
      * 
