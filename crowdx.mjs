@@ -3,45 +3,67 @@
  * This singleton holds all global state related to creating, maintaining, and
  * triggering subscriptions
  */
-class CrowdXTrackingStore {
+ class CrowdXTrackingStore {
 
+
+    // These three properties are all of the state in this class
+
+    /**
+     * @type {Map<() => unknown, Set<Set<() => unknown>>>}
+     */
     reactionSubscriptionSets = new Map();
 
     /**
+     * @type {null | { trackedFunction: () => unknown, reactionSets: Set<Set<() => unknown>> }}
+     */
+    currentlyTracking = null;
+
+    /**
+     * @type {null | Set<Set<() => unknown>>}
+     */
+    currentActionReactionSets = null;
+
+
+    /**
      * When a tracked function is being tracked, a reference to it is kept in 
-     * currentTrackedFunction and the observables it encounters are registered 
+     * currentTracking.trackedFunction and the observables it encounters are registered 
      * in reactionSetsForCurrentTrackedFn. When the function completes, the 
      * reaction is added to all found observables, and these pieces of state 
      * get cleared.
+     * 
+     * @param {() => unknown} func
      */
-    currentTrackedFunction = null;
-    reactionSetsForCurrentTrackedFn = null;
     beginTracking(func) {
-        this.currentTrackedFunction = func;
-        this.reactionSetsForCurrentTrackedFn = new Set();
+        this.currentlyTracking = {
+            trackedFunction: func,
+            reactionSets: new Set()
+        }
 
-        if (!this.reactionSubscriptionSets.has(this.currentTrackedFunction)) {
-            this.reactionSubscriptionSets.set(this.currentTrackedFunction, new Set());
+        if (!this.reactionSubscriptionSets.has(this.currentlyTracking.trackedFunction)) {
+            this.reactionSubscriptionSets.set(this.currentlyTracking.trackedFunction, new Set());
         }
     }
     completeTracking() {
-        for (const reactionSet of this.reactionSetsForCurrentTrackedFn) {
-            reactionSet.add(this.currentTrackedFunction);
-        }
+        if (this.currentlyTracking != null) {
+            for (const reactionSet of this.currentlyTracking.reactionSets) {
+                reactionSet.add(this.currentlyTracking.trackedFunction);
+            }
 
-        this.currentTrackedFunction = null;
-        this.reactionSetsForCurrentTrackedFn = null;
+            this.currentlyTracking = null;
+        }
     }
 
     
     /**
      * Given an observable's reaction set, tracks it in the context of the 
      * currently-running tracked function, if any.
+     * 
+     * @param {Set<() => unknown>} reactionSet
      */
     track(reactionSet) {
-        if (this.currentTrackedFunction != null) {
-            this.reactionSetsForCurrentTrackedFn.add(reactionSet);
-            this.reactionSubscriptionSets.get(this.currentTrackedFunction).add(reactionSet);
+        if (this.currentlyTracking != null) {
+            this.currentlyTracking.reactionSets.add(reactionSet);
+            this.reactionSubscriptionSets.get(this.currentlyTracking.trackedFunction)?.add(reactionSet);
         }
     }
 
@@ -52,6 +74,8 @@ class CrowdXTrackingStore {
      * Beyond just stopping the reaction from continuing to trigger, this is 
      * important to do when you no longer want the reaction because it allows any 
      * memory being referenced by it to be cleaned up, preventing memory-leaks.
+     * 
+     * @param {() => unknown} reaction
      */
     dispose(reaction) {
         const reactionSets = this.reactionSubscriptionSets.get(reaction);
@@ -72,7 +96,6 @@ class CrowdXTrackingStore {
      * currentActionObservables. Once the action is complete, all of those 
      * observables finally publish at once, with a consistent app state.
      */
-    currentActionReactionSets = null;
     beginAction() {
         this.currentActionReactionSets = new Set();
     }
@@ -80,7 +103,9 @@ class CrowdXTrackingStore {
         const observables = this.currentActionReactionSets;
         this.currentActionReactionSets = null;
 
-        this.publishAll(observables);
+        if (observables != null) {
+            this.publishAll(observables);
+        }
     }
 
 
@@ -88,6 +113,8 @@ class CrowdXTrackingStore {
      * Given the reaction set for an observable which was mutated, takes 
      * the appropriate course of action depending on whether or not we're 
      * currently inside an action.
+     * 
+     * @param {Set<() => unknown>} reactionSet
      */
     publish(reactionSet) {
         if (this.currentActionReactionSets != null) {
@@ -105,6 +132,8 @@ class CrowdXTrackingStore {
     /**
      * Same as publish(), but for multiple sets of reaction. De-dupes reactions
      * to avoid redundant calls.
+     * 
+     * @param {Set<Set<() => unknown>>} reactionSets
      */
     publishAll(reactionSets) {
         if (this.currentActionReactionSets != null) {
@@ -250,6 +279,11 @@ const proxyHandler = {
  * parentReactionSet is an optional parameter for internal use by the library 
  * only. It is used to allow child objects/arrays to publish changes to their 
  * entire selves (as opposed to changes to one of their members).
+ * 
+ * @template T
+ * @param {T} val
+ * @param {Set<() => unknown>} [parentReactionSet]
+ * @returns {T}
  */
 export function observable(val, parentReactionSet) {
     if (typeof val === "object" && val != null && !Object.hasOwnProperty(PROPERTY_REACTIONS)) {
@@ -289,17 +323,19 @@ export function observable(val, parentReactionSet) {
         }
 
         return proxy;
-    } else if(typeof val === "object" && val != null && !Object.hasOwnProperty(PROPERTY_REACTIONS)) {
+    } else if(typeof val === "object" && val != null && !Object.hasOwnProperty(PARENT_REACTIONS)) {
 
         // If this object is already observable but is being moved to a new 
         // parent, update its parent reaction-set reference
         if (parentReactionSet != null) {
-            Object.defineProperty(observableVal, PARENT_REACTIONS, {
+            Object.defineProperty(val, PARENT_REACTIONS, {
                 value: parentReactionSet,
                 writable: false,
                 enumerable: false
             })
         }
+
+        return val;
     } else {
         return val;
     }
@@ -315,6 +351,11 @@ export function observable(val, parentReactionSet) {
  * functions to be re-evaluated. In practice, this means effectFn will have 
  * another effect on the world. This is the key useful mechanism of this 
  * library.
+ * 
+ * @template T
+ * @param {() => T} trackedFn
+ * @param {(result: T) => void} effectFn
+ * @returns {DisposalHandle}
  */
 export function reaction(trackedFn, effectFn) {
     const reactionFn = function() {
@@ -326,7 +367,7 @@ export function reaction(trackedFn, effectFn) {
 
     reactionFn();
 
-    const disposalHandle = {};
+    const disposalHandle = /** @type {DisposalHandle} */ ({});
 
     Object.defineProperty(disposalHandle, REACTION_FOR_DISPOSAL, {
         value: reactionFn,
@@ -341,6 +382,10 @@ export function reaction(trackedFn, effectFn) {
 const REACTION_FOR_DISPOSAL = Symbol("REACTION_FOR_DISPOSAL");
 
 /**
+ * @typedef {{ [REACTION_FOR_DISPOSAL]: () => void }} DisposalHandle
+ */
+
+/**
  * An action is a function that mutates observables, but doesn't publish on 
  * intermediate states; it waits until the entire action has completed before
  * publishing. The two main benefits of this are:
@@ -350,13 +395,17 @@ const REACTION_FOR_DISPOSAL = Symbol("REACTION_FOR_DISPOSAL");
  * 
  * 2) Performance. Changing multiple properties in sequence won't cause extra 
  * work to be done and then immediately discarded.
+ * 
+ * @template {(...params: any[]) => void} F
+ * @param {F} fn
+ * @returns {F}
  */
 export function action(fn) {
-    return function(...args) {
+    return /** @type F */ (function(...args) {
         subscriptionsStore.beginAction();
         fn(...args);
         subscriptionsStore.completeAction();
-    }
+    })
 }
 
 /**
@@ -369,10 +418,18 @@ export function action(fn) {
  * end up with a graph of derived values where, when a base observable changes,
  * only the parts of the graph that actually need to be re-computed get 
  * recomputed. This is where this paradigm really gets powerful.
+ * 
+ * @template T
+ * @param {() => T} fn
+ * @returns {() => T | undefined}
  */
 export function computed(fn) {
     
-    // We store the most recently-computed value in an observable in scope
+    /**
+     * We store the most recently-computed value in an observable in scope
+     * 
+     * @type {{ value: T|undefined }}
+     */
     const cache = observable({ value: undefined });
     
     // We eagerly set up our reaction, computing the initial cache value 
@@ -411,6 +468,8 @@ export function computed(fn) {
  * Beyond just stopping the reaction from continuing to trigger, this is 
  * important to do when you no longer want the reaction because it allows any 
  * memory being referenced by it to be cleaned up, preventing memory-leaks.
+ * 
+ * @param {DisposalHandle} disposalHandle
  */
 export function dispose(disposalHandle) {
     if (disposalHandle[REACTION_FOR_DISPOSAL] != null) {
